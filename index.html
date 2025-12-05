@@ -1,15 +1,146 @@
-// ------------------ GLOBAL ------------------
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 2 Data Processing</title>
+
+<!-- ========== INLINE CSS (from style.css) ========== -->
+<style>
+body {
+    font-family: Arial, sans-serif;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 20px;
+    background: linear-gradient(to bottom right, #4f46e5, #7c3aed);
+    min-height: 100vh;
+}
+.card {
+    background: white;
+    border-radius: 10px;
+    padding: 30px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    margin-top: 30px;
+}
+h1 {
+    color: #1f2937;
+}
+.upload-zone {
+    border: 2px dashed #d1d5db;
+    border-radius: 8px;
+    padding: 40px;
+    text-align: center;
+    background: #f9fafb;
+    cursor: pointer;
+    margin: 20px 0;
+}
+.upload-zone:hover {
+    background: #f3f4f6;
+    border-color: #4f46e5;
+}
+button {
+    background: #4f46e5;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-right: 10px;
+}
+button:hover {
+    background: #4338ca;
+}
+button:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+}
+.success-btn {
+    background: #10b981;
+}
+.success-btn:hover {
+    background: #059669;
+}
+.progress {
+    width: 100%;
+    height: 24px;
+    background: #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 20px 0;
+}
+.progress-bar {
+    height: 100%;
+    background: #4f46e5;
+    text-align: center;
+    color: white;
+    line-height: 24px;
+    transition: width 0.3s;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 25px;
+    font-size: 12px;
+}
+th, td {
+    border: 1px solid #e5e7eb;
+    padding: 6px;
+    text-align: center;
+}
+th {
+    background: #f3f4f6;
+    font-weight: bold;
+}
+</style>
+
+<!-- PapaParse -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+
+</head>
+<body>
+
+<div class="card">
+    <h1>Day 2 Data Processing</h1>
+    <p>Upload all participant files and generate the master sheet.</p>
+
+    <div class="upload-zone" onclick="document.getElementById('files').click()">
+        <p style="font-size: 48px; margin: 0;">📁</p>
+        <p><strong>Click to select your files</strong></p>
+        <p style="font-size: 14px; color: #6b7280;">CSV/TXT files with period-wise structure</p>
+        <p id="fileInfo" style="color:#10b981; font-weight: bold;"></p>
+    </div>
+
+    <input type="file" id="files" multiple accept=".csv,.txt" style="display:none">
+
+    <button id="processBtn" disabled onclick="processAllFiles()">⚙️ Process Files</button>
+    <button id="downloadBtn" class="success-btn" style="display:none" onclick="downloadCSV()">⬇️ Download Master Sheet</button>
+
+    <div id="progress"></div>
+    <div id="results"></div>
+</div>
+
+<!-- ========== INLINE JS (from script.js) ========== -->
+<script>
+// ============================================================
+// GLOBALS
+// ============================================================
 let files = [];
 let results = [];
 
-// ------------------ FILE SELECT ------------------
+// ============================================================
+// FILE SELECTION
+// ============================================================
 document.getElementById("files").addEventListener("change", e => {
     files = Array.from(e.target.files);
-    document.getElementById("fileInfo").textContent = files.length + " files selected";
+    document.getElementById("fileInfo").textContent =
+        files.length + " files selected";
     document.getElementById("processBtn").disabled = files.length === 0;
 });
 
-// ------------------ PROCESS ALL FILES ------------------
+// ============================================================
+// PROCESS ALL FILES
+// ============================================================
 async function processAllFiles() {
     results = [];
     document.getElementById("downloadBtn").style.display = "none";
@@ -18,22 +149,28 @@ async function processAllFiles() {
         updateProgress(i + 1, files.length);
 
         const data = await parseCSV(files[i]);
-        const metrics = extractMetrics(files[i].name, data);
-        results.push(metrics);
+        const record = extractMetrics(files[i].name, data);
+        results.push(record);
     }
 
     showResults();
     document.getElementById("downloadBtn").style.display = "inline-block";
 }
 
-// ------------------ PROGRESS BAR ------------------
-function updateProgress(count, total) {
-    const pct = Math.round((count / total) * 100);
-    document.getElementById("progress").innerHTML =
-        `<div class="progress"><div class="progress-bar" style="width:${pct}%">${pct}%</div></div>`;
+// ============================================================
+// PROGRESS BAR
+// ============================================================
+function updateProgress(current, total) {
+    const pct = Math.round((current / total) * 100);
+    document.getElementById("progress").innerHTML = `
+        <div class="progress">
+            <div class="progress-bar" style="width:${pct}%">${pct}% (${current}/${total})</div>
+        </div>`;
 }
 
-// ------------------ CSV PARSER ------------------
+// ============================================================
+// CSV PARSER
+// ============================================================
 function parseCSV(file) {
     return new Promise(resolve => {
         Papa.parse(file, {
@@ -45,46 +182,40 @@ function parseCSV(file) {
     });
 }
 
-// ------------------------------------------------------------
-//               MAIN EXTRACTION LOGIC (FIXED)
-// ------------------------------------------------------------
+// ============================================================
+// MAIN EXTRACTION LOGIC
+// ============================================================
 function extractMetrics(filename, data) {
-
     const id = filename.replace(/\.(csv|txt)$/i, "").trim();
     const name = id;
 
-    // Helper finder
-    const findRow = label =>
-        data.find(r => String(r.Period).toLowerCase().includes(label));
+    function findRow(periodLabel) {
+        return data.find(r => String(r.Period).toLowerCase() === periodLabel.toLowerCase()) || null;
+    }
 
-    // Required rows
-    const base = findRow("task0");
-    const cond = findRow("task1");
+    const baseline   = findRow("task0");
+    const retrieval  = findRow("task1");
+    const pgq        = findRow("task7");
 
-    // Counterconditioning rows
     const counterRows = data.filter(r =>
         String(r.Period).toLowerCase().startsWith("task5part")
     );
 
-    const pgq = findRow("task7");
-
-    // Helper to extract metric by partial column name
     function metric(row, key) {
         if (!row) return "N/A";
-        const col = Object.keys(row).find(k =>
-            k.toLowerCase().includes(key.toLowerCase())
+        const col = Object.keys(row).find(c =>
+            c.toLowerCase().includes(key.toLowerCase())
         );
         return row[col] ?? "N/A";
     }
 
-    // Compute mean for counterconditioning across 5 parts
-    function meanOf(rows, key) {
-        if (!rows.length) return "N/A";
-        const vals = rows
+    function meanMetric(rows, key) {
+        const values = rows
             .map(r => metric(r, key))
             .filter(v => typeof v === "number" && !isNaN(v));
-        if (!vals.length) return "N/A";
-        return vals.reduce((a, b) => a + b, 0) / vals.length;
+
+        if (!values.length) return "N/A";
+        return (values.reduce((a, b) => a + b, 0) / values.length).toFixed(6);
     }
 
     return {
@@ -92,36 +223,36 @@ function extractMetrics(filename, data) {
         name,
 
         base: {
-            scl: metric(base, "mean scl"),
-            scr: metric(base, "mean scr"),
-            freq: metric(base, "scr freq"),
-            total: metric(base, "total scr"),
-            slope: metric(base, "slope"),
-            ns: metric(base, "ns-scl"),
-            sclstd: metric(base, "scl std"),
-            scrstd: metric(base, "scr std"),
+            scl: metric(baseline, "mean scl"),
+            scr: metric(baseline, "mean scr"),
+            freq: metric(baseline, "scr freq"),
+            total: metric(baseline, "total scr"),
+            slope: metric(baseline, "slope"),
+            ns: metric(baseline, "ns-scl"),
+            sclstd: metric(baseline, "scl std"),
+            scrstd: metric(baseline, "scr std")
         },
 
         cond: {
-            scl: metric(cond, "mean scl"),
-            scr: metric(cond, "mean scr"),
-            freq: metric(cond, "scr freq"),
-            total: metric(cond, "total scr"),
-            slope: metric(cond, "slope"),
-            ns: metric(cond, "ns-scl"),
-            sclstd: metric(cond, "scl std"),
-            scrstd: metric(cond, "scr std"),
+            scl: metric(retrieval, "mean scl"),
+            scr: metric(retrieval, "mean scr"),
+            freq: metric(retrieval, "scr freq"),
+            total: metric(retrieval, "total scr"),
+            slope: metric(retrieval, "slope"),
+            ns: metric(retrieval, "ns-scl"),
+            sclstd: metric(retrieval, "scl std"),
+            scrstd: metric(retrieval, "scr std")
         },
 
         counter: {
-            scl: meanOf(counterRows, "mean scl"),
-            scr: meanOf(counterRows, "mean scr"),
-            freq: meanOf(counterRows, "scr freq"),
-            total: meanOf(counterRows, "total scr"),
-            slope: meanOf(counterRows, "slope"),
-            ns: meanOf(counterRows, "ns-scl"),
-            sclstd: meanOf(counterRows, "scl std"),
-            scrstd: meanOf(counterRows, "scr std"),
+            scl: meanMetric(counterRows, "mean scl"),
+            scr: meanMetric(counterRows, "mean scr"),
+            freq: meanMetric(counterRows, "scr freq"),
+            total: meanMetric(counterRows, "total scr"),
+            slope: meanMetric(counterRows, "slope"),
+            ns: meanMetric(counterRows, "ns-scl"),
+            sclstd: meanMetric(counterRows, "scl std"),
+            scrstd: meanMetric(counterRows, "scr std")
         },
 
         pgq: {
@@ -132,92 +263,120 @@ function extractMetrics(filename, data) {
             slope: metric(pgq, "slope"),
             ns: metric(pgq, "ns-scl"),
             sclstd: metric(pgq, "scl std"),
-            scrstd: metric(pgq, "scr std"),
+            scrstd: metric(pgq, "scr std")
         }
     };
 }
 
-// ------------------------------------------------------------
-//                 PREVIEW TABLE (FIXED)
-// ------------------------------------------------------------
+// ============================================================
+// PREVIEW TABLE
+// ============================================================
 function showResults() {
     let html = `
-    <h3>Preview (first 10 rows)</h3>
-    <table>
-        <thead>
-            <tr>
-                <th>ID</th><th>Name</th>
+        <h2>Preview (First 10 Rows)</h2>
+        <div style="overflow-x:auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th><th>Name</th>
 
-                <th>SCL Base</th><th>SCL Cond</th><th>SCL Counter</th><th>SCL PGQ</th>
-                <th>SCR Base</th><th>SCR Cond</th><th>SCR Counter</th><th>SCR PGQ</th>
+                    <th>SCL Base</th><th>SCL Retrieve</th><th>SCL Counter</th><th>SCL PGQ</th>
+                    <th>SCR Base</th><th>SCR Retrieve</th><th>SCR Counter</th><th>SCR PGQ</th>
 
-                <th>Freq Base</th><th>Freq Cond</th><th>Freq Counter</th><th>Freq PGQ</th>
-                <th>Total Base</th><th>Total Cond</th><th>Total Counter</th><th>Total PGQ</th>
+                    <th>Freq Base</th><th>Freq Retrieve</th><th>Freq Counter</th><th>Freq PGQ</th>
 
-                <th>Slope Base</th><th>Slope Cond</th><th>Slope Counter</th><th>Slope PGQ</th>
-                <th>NS Base</th><th>NS Cond</th><th>NS Counter</th><th>NS PGQ</th>
+                    <th>Total Base</th><th>Total Retrieve</th><th>Total Counter</th><th>Total PGQ</th>
 
-                <th>SCL Std Base</th><th>SCL Std Cond</th><th>SCL Std Counter</th><th>SCL Std PGQ</th>
-                <th>SCR Std Base</th><th>SCR Std Cond</th><th>SCR Std Counter</th><th>SCR Std PGQ</th>
-            </tr>
-        </thead><tbody>
+                    <th>Slope Base</th><th>Slope Retrieve</th><th>Slope Counter</th><th>Slope PGQ</th>
+
+                    <th>NS Base</th><th>NS Retrieve</th><th>NS Counter</th><th>NS PGQ</th>
+
+                    <th>SCL Std Base</th><th>SCL Std Retrieve</th>
+                    <th>SCL Std Counter</th><th>SCL Std PGQ</th>
+
+                    <th>SCR Std Base</th><th>SCR Std Retrieve</th>
+                    <th>SCR Std Counter</th><th>SCR Std PGQ</th>
+                </tr>
+            </thead>
+            <tbody>
     `;
 
     results.slice(0, 10).forEach(r => {
         html += `
-        <tr>
-            <td>${r.id}</td><td>${r.name}</td>
+            <tr>
+                <td>${r.id}</td><td>${r.name}</td>
 
-            <td>${r.base.scl}</td><td>${r.cond.scl}</td><td>${r.counter.scl}</td><td>${r.pgq.scl}</td>
-            <td>${r.base.scr}</td><td>${r.cond.scr}</td><td>${r.counter.scr}</td><td>${r.pgq.scr}</td>
+                <td>${r.base.scl}</td><td>${r.cond.scl}</td><td>${r.counter.scl}</td><td>${r.pgq.scl}</td>
+                <td>${r.base.scr}</td><td>${r.cond.scr}</td><td>${r.counter.scr}</td><td>${r.pgq.scr}</td>
 
-            <td>${r.base.freq}</td><td>${r.cond.freq}</td><td>${r.counter.freq}</td><td>${r.pgq.freq}</td>
-            <td>${r.base.total}</td><td>${r.cond.total}</td><td>${r.counter.total}</td><td>${r.pgq.total}</td>
+                <td>${r.base.freq}</td><td>${r.cond.freq}</td><td>${r.counter.freq}</td><td>${r.pgq.freq}</td>
 
-            <td>${r.base.slope}</td><td>${r.cond.slope}</td><td>${r.counter.slope}</td><td>${r.pgq.slope}</td>
-            <td>${r.base.ns}</td><td>${r.cond.ns}</td><td>${r.counter.ns}</td><td>${r.pgq.ns}</td>
+                <td>${r.base.total}</td><td>${r.cond.total}</td><td>${r.counter.total}</td><td>${r.pgq.total}</td>
 
-            <td>${r.base.sclstd}</td><td>${r.cond.sclstd}</td><td>${r.counter.sclstd}</td><td>${r.pgq.sclstd}</td>
-            <td>${r.base.scrstd}</td><td>${r.cond.scrstd}</td><td>${r.counter.scrstd}</td><td>${r.pgq.scrstd}</td>
-        </tr>`;
+                <td>${r.base.slope}</td><td>${r.cond.slope}</td><td>${r.counter.slope}</td><td>${r.pgq.slope}</td>
+
+                <td>${r.base.ns}</td><td>${r.cond.ns}</td><td>${r.counter.ns}</td><td>${r.pgq.ns}</td>
+
+                <td>${r.base.sclstd}</td>
+                <td>${r.cond.sclstd}</td>
+                <td>${r.counter.sclstd}</td>
+                <td>${r.pgq.sclstd}</td>
+
+                <td>${r.base.scrstd}</td>
+                <td>${r.cond.scrstd}</td>
+                <td>${r.counter.scrstd}</td>
+                <td>${r.pgq.scrstd}</td>
+            </tr>
+        `;
     });
 
-    html += "</tbody></table>";
+    html += "</tbody></table></div>";
     document.getElementById("results").innerHTML = html;
 }
 
-// ------------------------------------------------------------
-//                 DOWNLOAD CSV (unchanged)
-// ------------------------------------------------------------
+// ============================================================
+// EXPORT CSV
+// ============================================================
 function downloadCSV() {
     const header = [
-        "ID", "Name",
-        "SCL Base","SCL Cond","SCL Counter","SCL PGQ",
-        "SCR Base","SCR Cond","SCR Counter","SCR PGQ",
-        "Freq Base","Freq Cond","Freq Counter","Freq PGQ",
-        "Total Base","Total Cond","Total Counter","Total PGQ",
-        "Slope Base","Slope Cond","Slope Counter","Slope PGQ",
-        "NS Base","NS Cond","NS Counter","NS PGQ",
-        "SCL Std Base","SCL Std Cond","SCL Std Counter","SCL Std PGQ",
-        "SCR Std Base","SCR Std Cond","SCR Std Counter","SCR Std PGQ"
+        "ID","Name",
+        "SCL Base","SCL Retrieve","SCL Counter","SCL PGQ",
+        "SCR Base","SCR Retrieve","SCR Counter","SCR PGQ",
+        "Freq Base","Freq Retrieve","Freq Counter","Freq PGQ",
+        "Total Base","Total Retrieve","Total Counter","Total PGQ",
+        "Slope Base","Slope Retrieve","Slope Counter","Slope PGQ",
+        "NS Base","NS Retrieve","NS Counter","NS PGQ",
+        "SCL Std Base","SCL Std Retrieve","SCL Std Counter","SCL Std PGQ",
+        "SCR Std Base","SCR Std Retrieve","SCR Std Counter","SCR Std PGQ"
     ];
 
     const rows = results.map(r => [
         r.id, r.name,
+
         r.base.scl, r.cond.scl, r.counter.scl, r.pgq.scl,
         r.base.scr, r.cond.scr, r.counter.scr, r.pgq.scr,
+
         r.base.freq, r.cond.freq, r.counter.freq, r.pgq.freq,
+
         r.base.total, r.cond.total, r.counter.total, r.pgq.total,
+
         r.base.slope, r.cond.slope, r.counter.slope, r.pgq.slope,
+
         r.base.ns, r.cond.ns, r.counter.ns, r.pgq.ns,
+
         r.base.sclstd, r.cond.sclstd, r.counter.sclstd, r.pgq.sclstd,
         r.base.scrstd, r.cond.scrstd, r.counter.scrstd, r.pgq.scrstd
     ]);
 
     const csv = [header, ...rows].map(r => r.join(",")).join("\n");
 
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-    link.download = "EDA_MASTER_SHEET.csv";
-    link.click();
+    const blob = new Blob([csv], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "Day2_MasterSheet.csv";
+    a.click();
 }
+</script>
+
+</body>
+</html>
